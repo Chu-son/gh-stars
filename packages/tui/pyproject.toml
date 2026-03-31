@@ -1,0 +1,20 @@
+[project]
+name = "tui"
+version = "0.1.0"
+description = "GitHub Star TUI Interface"
+requires-python = ">=3.12"
+dependencies = [
+    "textual>=0.70.0",
+    "python-dotenv>=1.0.0",
+    "pyyaml>=6.0.0",
+    "collector",
+    "processor",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv.sources]
+collector = { workspace = true }
+processor = { workspace = true }

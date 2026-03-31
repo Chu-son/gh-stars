@@ -1,0 +1,7 @@
+.env
+config.yaml
+data/*.db
+__pycache__/
+.venv/
+*.egg-info/
+.pytest_cache/

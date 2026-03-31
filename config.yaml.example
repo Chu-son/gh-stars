@@ -1,0 +1,10 @@
+database:
+  path: ./data/gh_favorite.db
+
+tagger:
+  mode: rule_based               # rule_based | ml | llm
+  llm_endpoint: http://localhost:11434
+  llm_model: gemma3
+
+sync:
+  page_size: 100

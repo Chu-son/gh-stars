@@ -1,0 +1,26 @@
+[project]
+name = "gh-favorite"
+version = "0.1.0"
+description = "GitHub Star Management TUI"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "collector",
+    "processor",
+    "tui",
+]
+
+[tool.uv.workspace]
+members = ["packages/*"]
+
+[tool.uv.sources]
+collector = { workspace = true }
+processor = { workspace = true }
+tui = { workspace = true }
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "respx>=0.21.0",
+]

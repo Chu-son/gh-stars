@@ -1,0 +1,10 @@
+[project]
+name = "processor"
+version = "0.1.0"
+description = "GitHub Star Data Processor (DB/Taggger/Search)"
+requires-python = ">=3.12"
+dependencies = []
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
