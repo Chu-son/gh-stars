@@ -9,55 +9,41 @@ import random
 from processor.database import repository
 from processor.database.connection import get_db_connection
 from .detail_screen import DetailScreen
+from rich.text import Text
+from rich.console import Group, RenderableType
 
 class RepoItem(ListItem):
-    """Custom ListItem to display repository information in multiple lines."""
+    """Custom ListItem to display repository information efficiently in one DOM node."""
     
     def __init__(self, repo: dict):
         super().__init__()
         self.repo = repo
 
-    def compose(self) -> ComposeResult:
-        with Vertical(id="repo-content"):
-            with Horizontal(id="repo-header"):
-                yield Label(f"⭐ {self.repo['stars']} | {self.repo['full_name']}", id="repo-name")
-                if self.repo['primary_language']:
-                    yield Label(f" [{self.repo['primary_language']}]", id="repo-lang")
+    def render(self) -> RenderableType:
+        """Render the item using Rich for maximum performance."""
+        # Line 1: Stars | Repo Name [Language]
+        title_text = Text(f"⭐ {self.repo['stars']} | {self.repo['full_name']}", style="bold cyan")
+        if self.repo['primary_language']:
+            title_text.append(f" [{self.repo['primary_language']}]", style="green")
+        
+        renderables = [title_text]
+        
+        # Line 2: Tags
+        tags = self.repo.get("tags_list", [])
+        if tags:
+            renderables.append(Text(f"Tags: {', '.join(tags)}", style="italic dim"))
             
-            tags = self.repo.get("tags_list", [])
-            if tags:
-                yield Label(f"Tags: {', '.join(tags)}", id="repo-tags")
+        # Line 3: Description
+        desc = self.repo.get("description", "")
+        if desc:
+            renderables.append(Text(desc))
             
-            desc = self.repo.get("description", "")
-            if desc:
-                yield Label(desc, id="repo-desc")
-    
+        return Group(*renderables)
+
     DEFAULT_CSS = """
     RepoItem {
         padding: 1;
         border-bottom: solid $accent;
-        height: auto;
-    }
-    #repo-content {
-        height: auto;
-    }
-    #repo-header {
-        height: 1;
-    }
-    #repo-name {
-        text-style: bold;
-        color: $accent;
-    }
-    #repo-lang {
-        color: $secondary;
-        margin-left: 1;
-    }
-    #repo-tags {
-        color: $text-muted;
-        text-style: italic;
-    }
-    #repo-desc {
-        color: $text;
         height: auto;
     }
     """
