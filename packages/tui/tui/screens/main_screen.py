@@ -48,6 +48,13 @@ class RepoItem(ListItem):
     }
     """
 
+class FilterItem(ListItem):
+    """タグや言語のフィルタ用ListItem。"""
+    def __init__(self, label: str, filter_value: str | None, filter_type: str):
+        super().__init__(Label(label))
+        self.filter_value = filter_value
+        self.filter_type = filter_type # "all", "tag", "lang"
+
 class MainScreen(Screen):
     """リポジトリ一覧表示画面。"""
     
@@ -92,6 +99,8 @@ class MainScreen(Screen):
     def __init__(self):
         super().__init__()
         self.tag_filter = None
+        self.language_filter = None
+        self.sidebar_mode = "none"  # "none", "tags", "languages"
         self.keyword = None
         self.sort_by = "starred_at"
         self.sort_descending = True
@@ -100,8 +109,8 @@ class MainScreen(Screen):
         yield Header()
         yield Horizontal(
             Vertical(
-                Label("Tags"),
-                ListView(id="tag_list"),
+                Label("Tags", id="sidebar_title"),
+                ListView(id="sidebar_list"),
                 id="sidebar"
             ),
             Vertical(
@@ -114,34 +123,47 @@ class MainScreen(Screen):
         yield Footer()
 
     async def on_mount(self) -> None:
+        self.query_one("#sidebar").display = False
         await self.reload_data()
 
     async def reload_data(self) -> None:
         """データを再読み込みして表示を更新します。"""
-        await self.reload_tags()
+        await self.reload_sidebar()
         self.reload_list()
 
-    async def reload_tags(self) -> None:
-        """タグ一覧のみを再構築します。"""
-        app_config = self.app.app_config
-        with get_db_connection(app_config.db_path) as conn:
-            tag_list = self.query_one("#tag_list", ListView)
-            # 現在の選択を保存
-            current_id = None
-            if tag_list.highlighted_child:
-                current_id = tag_list.highlighted_child.id
-
-            await tag_list.clear()
-            tag_list.append(ListItem(Label(" [All] "), id="tag_all"))
-            for tag in repository.get_all_tags(conn):
-                tag_list.append(ListItem(Label(f" {tag} "), id=f"tag_{tag}"))
+    async def reload_sidebar(self) -> None:
+        """現在のsidebar_modeに応じてサイドバーの中身を再構築します。"""
+        if self.sidebar_mode == "none":
+            return
             
-            # 選択を復元
-            if current_id:
-                for idx, child in enumerate(tag_list.children):
-                    if child.id == current_id:
-                        tag_list.index = idx
-                        break
+        app_config = self.app.app_config
+        sidebar_list = self.query_one("#sidebar_list", ListView)
+        title = self.query_one("#sidebar_title", Label)
+        
+        # 現在の選択を保存
+        current_filter = None
+        if sidebar_list.highlighted_child and isinstance(sidebar_list.highlighted_child, FilterItem):
+            current_filter = (sidebar_list.highlighted_child.filter_type, sidebar_list.highlighted_child.filter_value)
+
+        await sidebar_list.clear()
+        sidebar_list.append(FilterItem(" [All] ", None, "all"))
+        
+        with get_db_connection(app_config.db_path) as conn:
+            if self.sidebar_mode == "tags":
+                title.update("Tags")
+                for tag in repository.get_all_tags(conn):
+                    sidebar_list.append(FilterItem(f" {tag} ", tag, "tag"))
+            elif self.sidebar_mode == "languages":
+                title.update("Languages")
+                for lang in repository.get_all_languages(conn):
+                    sidebar_list.append(FilterItem(f" {lang} ", lang, "lang"))
+        
+        # 選択を復元
+        if current_filter:
+            for idx, child in enumerate(sidebar_list.children):
+                if isinstance(child, FilterItem) and (child.filter_type, child.filter_value) == current_filter:
+                    sidebar_list.index = idx
+                    break
 
     def reload_list(self) -> None:
         """リポジトリ一覧のみを再構築します。"""
@@ -150,6 +172,7 @@ class MainScreen(Screen):
             repos = repository.get_all_repositories(
                 conn, 
                 tag_filter=self.tag_filter, 
+                language_filter=self.language_filter,
                 keyword=self.keyword, 
                 sort_by=self.sort_by,
                 sort_descending=self.sort_descending
@@ -171,22 +194,32 @@ class MainScreen(Screen):
         }
         direction = "▼" if self.sort_descending else "▲"
         sort_label = f"{sort_names.get(self.sort_by, '')} {direction}"
-        filter_label = f"Filter: {self.tag_filter}" if self.tag_filter else "Filter: [All]"
-        
         repo_list = self.query_one("#repo_list", ListView)
         count_label = f"{len(repo_list.children)} items"
+        
+        filter_parts = []
+        if self.tag_filter: filter_parts.append(f"Tag:{self.tag_filter}")
+        if self.language_filter: filter_parts.append(f"Lang:{self.language_filter}")
+        filter_label = f"Filter: {' & '.join(filter_parts)}" if filter_parts else "Filter: [All]"
         
         parts = [f"Sort: {sort_label}", filter_label, count_label]
         self.query_one("#status_bar", Static).update(" | ".join(parts))
 
     def on_list_view_selected(self, event: ListView.Selected) -> None:
         """リストが選択された時の処理。"""
-        if event.list_view.id == "tag_list":
-            if event.item.id == "tag_all":
-                self.tag_filter = None
-            else:
-                self.tag_filter = event.item.id.replace("tag_", "")
-            self.reload_list()
+        if event.list_view.id == "sidebar_list":
+            item = event.item
+            if isinstance(item, FilterItem):
+                if item.filter_type == "all":
+                    if self.sidebar_mode == "tags":
+                        self.tag_filter = None
+                    elif self.sidebar_mode == "languages":
+                        self.language_filter = None
+                elif item.filter_type == "tag":
+                    self.tag_filter = item.filter_value
+                elif item.filter_type == "lang":
+                    self.language_filter = item.filter_value
+                self.reload_list()
         elif event.list_view.id == "repo_list":
             if isinstance(event.item, RepoItem):
                 self.app.push_screen(DetailScreen(event.item.repo["github_id"]))
@@ -249,9 +282,18 @@ class MainScreen(Screen):
         if self.focused:
             self.focused.scroll_relative(y=-(self.focused.size.height // 2))
 
-    def action_toggle_sidebar(self) -> None:
+    async def action_toggle_sidebar(self) -> None:
         sidebar = self.query_one("#sidebar")
-        sidebar.display = not sidebar.display
+        if self.sidebar_mode == "none":
+            self.sidebar_mode = "tags"
+            sidebar.display = True
+            await self.reload_sidebar()
+        elif self.sidebar_mode == "tags":
+            self.sidebar_mode = "languages"
+            await self.reload_sidebar()
+        else:
+            self.sidebar_mode = "none"
+            sidebar.display = False
 
     def action_open_detail(self) -> None:
         repo_list = self.query_one("#repo_list", ListView)

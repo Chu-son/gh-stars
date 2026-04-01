@@ -33,6 +33,7 @@ SORT_COLUMNS = {
 }
 
 def get_all_repositories(conn: sqlite3.Connection, tag_filter: str | None = None,
+                         language_filter: str | None = None,
                          keyword: str | None = None, sort_by: str = "starred_at",
                          sort_descending: bool = True) -> list[dict]:
     """リポジトリ一覧を取得します。"""
@@ -45,6 +46,10 @@ def get_all_repositories(conn: sqlite3.Connection, tag_filter: str | None = None
         query += " JOIN tags t ON rt.tag_id = t.id"
         where_clauses.append("t.name = :tag_filter")
         params["tag_filter"] = tag_filter
+
+    if language_filter:
+        where_clauses.append("r.primary_language = :language_filter")
+        params["language_filter"] = language_filter
 
     if keyword:
         where_clauses.append("(r.full_name LIKE :keyword OR r.description LIKE :keyword OR r.topics LIKE :keyword)")
@@ -166,6 +171,12 @@ def remove_tag_from_repo(conn: sqlite3.Connection, repo_id: str, tag_name: str) 
 def get_all_tags(conn: sqlite3.Connection) -> list[str]:
     """登録されている全タグ名を取得します。"""
     cursor = conn.execute("SELECT name FROM tags ORDER BY name ASC")
+    return [row[0] for row in cursor.fetchall()]
+
+def get_all_languages(conn: sqlite3.Connection) -> list[str]:
+    """登録されている全リポジトリの主要言語(primary_language)一覧を取得します。"""
+    query = "SELECT DISTINCT primary_language FROM repositories WHERE primary_language IS NOT NULL ORDER BY primary_language ASC"
+    cursor = conn.execute(query)
     return [row[0] for row in cursor.fetchall()]
 
 def record_tag_edit(conn: sqlite3.Connection, repo_id: str, action: str, tag_name: str) -> None:
