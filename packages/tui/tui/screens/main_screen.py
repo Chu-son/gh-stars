@@ -57,7 +57,7 @@ class MainScreen(Screen):
         border-right: solid $accent;
     }
     #content {
-        width: 82%;
+        width: 1fr;
     }
     #search_bar {
         margin: 1;
