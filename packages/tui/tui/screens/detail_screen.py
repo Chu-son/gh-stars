@@ -26,10 +26,17 @@ class DetailScreen(Screen):
     """
 
     BINDINGS = [
-        Binding("h", "go_back", "Back", show=False),
+        Binding("h", "scroll_left", "Left", show=False),
+        Binding("l", "scroll_right", "Right", show=False),
+        Binding("j", "cursor_down", "Down", show=False),
+        Binding("k", "cursor_up", "Up", show=False),
+        Binding("g", "cursor_top", "Top", show=False),
+        Binding("G", "cursor_bottom", "Bottom", show=False),
         Binding("escape", "go_back", "Back", show=False),
         Binding("o", "open_browser", "Open Browser", show=False),
         Binding("t", "edit_tags", "Edit Tags", show=False),
+        Binding("ctrl+d", "page_down", "PgDn", show=False),
+        Binding("ctrl+u", "page_up", "PgUp", show=False),
     ]
 
     def __init__(self, repo_id: str):
@@ -107,3 +114,31 @@ class DetailScreen(Screen):
     def action_go_back(self) -> None:
         """メイン画面に戻ります。"""
         self.app.pop_screen()
+
+    # Vim-like Navigation
+    def action_cursor_down(self) -> None:
+        self.query_one("#repo_markdown").scroll_relative(y=1)
+
+    def action_cursor_up(self) -> None:
+        self.query_one("#repo_markdown").scroll_relative(y=-1)
+
+    def action_scroll_left(self) -> None:
+        self.query_one("#repo_markdown").scroll_relative(x=-4)
+
+    def action_scroll_right(self) -> None:
+        self.query_one("#repo_markdown").scroll_relative(x=4)
+
+    def action_cursor_top(self) -> None:
+        self.query_one("#repo_markdown").scroll_to(y=0)
+
+    def action_cursor_bottom(self) -> None:
+        md = self.query_one("#repo_markdown")
+        md.scroll_to(y=md.virtual_size.height)
+
+    def action_page_down(self) -> None:
+        md = self.query_one("#repo_markdown")
+        md.scroll_relative(y=md.size.height // 2)
+
+    def action_page_up(self) -> None:
+        md = self.query_one("#repo_markdown")
+        md.scroll_relative(y=-(md.size.height // 2))

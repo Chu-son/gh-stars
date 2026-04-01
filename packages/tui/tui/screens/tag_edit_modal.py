@@ -4,6 +4,7 @@ from textual.widgets import Label, Button, Checkbox, Input, Static
 from textual.containers import Vertical, Horizontal, Grid
 from processor.database import repository
 from processor.database.connection import get_db_connection
+from textual.binding import Binding
 
 class TagEditModal(ModalScreen[bool]):
     """タグを編集するためのモーダル画面。"""
@@ -37,6 +38,14 @@ class TagEditModal(ModalScreen[bool]):
         align: right middle;
     }
     """
+
+    BINDINGS = [
+        Binding("escape", "dismiss_false", "Cancel", show=False),
+        Binding("j", "cursor_down", "Down", show=False),
+        Binding("k", "cursor_up", "Up", show=False),
+        Binding("h", "scroll_left", "Left", show=False),
+        Binding("l", "scroll_right", "Right", show=False),
+    ]
 
     def __init__(self, repo_id: str):
         super().__init__()
@@ -106,3 +115,22 @@ class TagEditModal(ModalScreen[bool]):
             repository.set_tags_for_repo(conn, self.repo_id, list(self.selected_tags), source='manual')
             conn.commit()
         self.dismiss(True)
+
+    def action_dismiss_false(self) -> None:
+        self.dismiss(False)
+
+    def action_cursor_down(self) -> None:
+        if self.focused:
+            self.focused.action_cursor_down()
+
+    def action_cursor_up(self) -> None:
+        if self.focused:
+            self.focused.action_cursor_up()
+
+    def action_scroll_left(self) -> None:
+        if self.focused:
+            self.focused.scroll_relative(x=-4)
+
+    def action_scroll_right(self) -> None:
+        if self.focused:
+            self.focused.scroll_relative(x=4)

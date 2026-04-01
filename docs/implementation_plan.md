@@ -457,6 +457,60 @@ parser.add_argument("--sync-only", action="store_true", help="同期のみ（TUI
 
 ---
 
+### J. UI/UX改善機能の実装（フェーズ1追加改修）
+
+以下の5つの機能追加により、UI/UXを向上させます。他開発者へのハンドオフを想定した詳細な手順です。
+
+#### 1. 全タブでのVimライクなキーバインド対応
+**対象ファイル:** `packages/tui/tui/screens/main_screen.py`
+- **目的:** 既存の `DataTable` 以外のコンポーネント（特にサイドバーの `ListView`）でも `j`, `k`, `g`, `G` などのスクロール操作を可能にする。
+- **手法:**
+  - `action_cursor_down(self)`, `action_cursor_up(self)`, `action_cursor_top(self)`, `action_cursor_bottom(self)` メソッドを改修。
+  - `self.focused` を用いて、現在フォーカスされているコンポーネント（ウィジェット）を取得する。
+  - `isinstance()` で型判定し、フォーカス先がタグ一覧の `ListView`（サイドバー）であれば、そのコンポーネントの `action_cursor_down()` 等を呼んで操作を移譲する。
+  - 変更後のメインリスト（後述の `ListView` や `DataTable`）がフォーカスされている場合は、該当コンポーネントの操作を行う。
+
+#### 2. h, l キーでの水平スクロール対応
+**対象ファイル:** `packages/tui/tui/screens/main_screen.py`
+- **目的:** 画面内に収まらない長いテキスト列を持つリストなどが存在した場合、左右のスクロールをキー操作で可能にする。
+- **手法:**
+  - `BINDINGS` リストに `Binding("h", "scroll_left", "Left", show=False)`, `Binding("l", "scroll_right", "Right", show=False)` を追加する。
+  - `action_scroll_left(self)` および `action_scroll_right(self)` メソッドを新規定義する。
+  - 現在フォーカスされているコンポーネントに対し、Textual標準のスクロールメソッドである `self.focused.scroll_relative(x=-1)` (左) / `self.focused.scroll_relative(x=1)` (右) などを呼び出し水平オフセット移動を実装する。
+
+#### 3. Tagsタブ（サイドバー）のトグル表示
+**対象ファイル:** `packages/tui/tui/screens/main_screen.py`
+- **目的:** 画面幅を有効活用するため、Tags一覧を `b` キーで表示・非表示（トグル）できるようにする。
+- **手法:**
+  - `BINDINGS` に `Binding("b", "toggle_sidebar", "Toggle Sidebar")` を追加。
+  - 新規に `action_toggle_sidebar(self)` を定義。
+  - `sidebar = self.query_one("#sidebar")` でサイドバーの UI コンテナ要素を取得し、`sidebar.display = not sidebar.display` とブール値を反転してセットする。これによりTextualのDOMから一時的に消え、メインのコンテンツエリアが全幅に自動展開される。
+
+#### 4. リポジトリリストの幅圧縮に伴う複数行対応（DataTable → ListView）
+**対象ファイル:** `packages/tui/tui/screens/main_screen.py`
+- **目的:** ウィンドウ幅が圧縮（またはサイドバー表示状態）されても、情報が途切れず自動で改行される「カード」形式のUIに変更する。
+- **手法:**
+  - **UI定義の置換:** `compose()` 内で定義している `#repo_table` (`DataTable`) を `ListView(id="repo_list")` へ変更する。
+  - **カスタム ListItem クラス定義:** `RepoItem(ListItem)` を `main_screen.py` 内（または専用モジュール）に定義する。
+    - `__init__` でリポジトリデータを DI する。
+    - `compose()` で `Vertical`, `Horizontal` を使い、情報をレイアウト（上段: repo_name / stars /lang、下段: description）。
+    - 説明文用ラベルの CSS で `height: auto` を適用し、複数行の自動折り返しが動作するように設定する。
+  - **データバインディング改修:** `reload_table()` メソッドを `reload_list()` とし、各リポジトリから `RepoItem` を生成して `ListView.append()` で登録するロジックに書き換える。
+  - **選択イベント改修:** `on_data_table_row_selected` イベントを `on_list_view_selected` に置き換える。選択された `RepoItem` からIDを抽出し、`DetailScreen` に遷移させる。
+
+#### 5. ソートにおける昇順・降順（ASC/DESC）のトグル機能
+**対象ファイル:** `packages/tui/tui/screens/main_screen.py` および `packages/processor/processor/database/repository.py`
+- **目的:** ワンキー（同じソートキーの連続押下）でソートの表示順を反転（トグル）できるようにする。
+- **手法 (main_screen.py):**
+  - メイン画面のインスタンス変数（状態）として `self.sort_descending = True` (デフォルト) を追加。
+  - 各 `action_sort_*` (例: `action_sort_stars`) メソッドにおいて、現在の `self.sort_by` と押下された項目が一致した場合は、`self.sort_descending = not self.sort_descending` として順番を反転。一致しない場合は項目を切り替え、対象のデフォルトの順番へ戻す。
+  - `_update_status_bar` メソッドで、`self.sort_descending` に応じてステータスバー上のアイコンを `▼` （降順）や `▲` （昇順）に動的に変更する。
+- **手法 (repository.py):**
+  - `get_all_repositories` 関数の引数にソート方向の指定 `sort_descending: bool = True` を追加する。
+  - 内部で組み立てている SQL クエリの `ORDER BY` 句に、変数の状態から生成した文字列 (`DESC` または `ASC`) を挿入し、正しい順番でデータを取得できるように修正する。
+
+---
+
 ## 検証計画
 
 ```bash

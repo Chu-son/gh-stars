@@ -26,14 +26,15 @@ def upsert_repository(conn: sqlite3.Connection, repo: dict) -> None:
     conn.execute(query, data)
 
 SORT_COLUMNS = {
-    "stars":      "r.stars DESC",
-    "name":       "r.full_name ASC",
-    "language":   "r.primary_language ASC NULLS LAST",
-    "starred_at": "r.starred_at DESC",
+    "stars":      "r.stars",
+    "name":       "r.full_name",
+    "language":   "r.primary_language",
+    "starred_at": "r.starred_at",
 }
 
 def get_all_repositories(conn: sqlite3.Connection, tag_filter: str | None = None,
-                         keyword: str | None = None, sort_by: str = "starred_at") -> list[dict]:
+                         keyword: str | None = None, sort_by: str = "starred_at",
+                         sort_descending: bool = True) -> list[dict]:
     """リポジトリ一覧を取得します。"""
     query = "SELECT r.* FROM repositories r"
     params = {}
@@ -52,7 +53,14 @@ def get_all_repositories(conn: sqlite3.Connection, tag_filter: str | None = None
     if where_clauses:
         query += " WHERE " + " AND ".join(where_clauses)
     
-    order_clause = SORT_COLUMNS.get(sort_by, SORT_COLUMNS["starred_at"])
+    col = SORT_COLUMNS.get(sort_by, SORT_COLUMNS["starred_at"])
+    direction = "DESC" if sort_descending else "ASC"
+    
+    if sort_by == "language":
+        order_clause = f"{col} {direction} NULLS LAST"
+    else:
+        order_clause = f"{col} {direction}"
+        
     query += f" ORDER BY {order_clause}"
     
     cursor = conn.execute(query, params)

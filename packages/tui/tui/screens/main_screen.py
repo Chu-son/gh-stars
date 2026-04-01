@@ -1,29 +1,82 @@
 from textual.app import ComposeResult
 from textual.screen import Screen
-from textual.widgets import Header, Footer, DataTable, Input, ListView, ListItem, Label, Static
-from textual.containers import Horizontal, Vertical
+from textual.widgets import Header, Footer, ListView, ListItem, Input, Label, Static
+from textual.containers import Horizontal, Vertical, Container
 from textual.binding import Binding
 from textual.coordinate import Coordinate
+from textual.message import Message
 import random
 from processor.database import repository
 from processor.database.connection import get_db_connection
 from .detail_screen import DetailScreen
+
+class RepoItem(ListItem):
+    """Custom ListItem to display repository information in multiple lines."""
+    
+    def __init__(self, repo: dict):
+        super().__init__()
+        self.repo = repo
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="repo-content"):
+            with Horizontal(id="repo-header"):
+                yield Label(f"⭐ {self.repo['stars']} | {self.repo['full_name']}", id="repo-name")
+                if self.repo['primary_language']:
+                    yield Label(f" [{self.repo['primary_language']}]", id="repo-lang")
+            
+            tags = self.repo.get("tags_list", [])
+            if tags:
+                yield Label(f"Tags: {', '.join(tags)}", id="repo-tags")
+            
+            desc = self.repo.get("description", "")
+            if desc:
+                yield Label(desc, id="repo-desc")
+    
+    DEFAULT_CSS = """
+    RepoItem {
+        padding: 1;
+        border-bottom: solid $accent;
+        height: auto;
+    }
+    #repo-content {
+        height: auto;
+    }
+    #repo-header {
+        height: 1;
+    }
+    #repo-name {
+        text-style: bold;
+        color: $accent;
+    }
+    #repo-lang {
+        color: $secondary;
+        margin-left: 1;
+    }
+    #repo-tags {
+        color: $text-muted;
+        text-style: italic;
+    }
+    #repo-desc {
+        color: $text;
+        height: auto;
+    }
+    """
 
 class MainScreen(Screen):
     """リポジトリ一覧表示画面。"""
     
     CSS = """
     #sidebar {
-        width: 20%;
+        width: 18%;
         border-right: solid $accent;
     }
     #content {
-        width: 80%;
+        width: 82%;
     }
     #search_bar {
         margin: 1;
     }
-    DataTable {
+    #repo_list {
         height: 1fr;
     }
     #status_bar {
@@ -36,9 +89,12 @@ class MainScreen(Screen):
     BINDINGS = [
         Binding("j", "cursor_down", "Down", show=False),
         Binding("k", "cursor_up", "Up", show=False),
+        Binding("h", "scroll_left", "Left", show=False),
+        Binding("l", "scroll_right", "Right", show=False),
         Binding("g", "cursor_top", "Top", show=False),
         Binding("G", "cursor_bottom", "Bottom", show=False),
-        Binding("l", "open_detail", "Open", show=False),
+        Binding("b", "toggle_sidebar", "Sidebar", show=False),
+        Binding("enter", "open_detail", "Open", show=False),
         Binding("ctrl+d", "page_down", "PgDn", show=False),
         Binding("ctrl+u", "page_up", "PgUp", show=False),
         Binding("1", "sort_stars", "Sort Stars", show=False),
@@ -52,6 +108,7 @@ class MainScreen(Screen):
         self.tag_filter = None
         self.keyword = None
         self.sort_by = "starred_at"
+        self.sort_descending = True
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -63,7 +120,7 @@ class MainScreen(Screen):
             ),
             Vertical(
                 Input(placeholder="Search by keyword...", id="search_bar"),
-                DataTable(id="repo_table"),
+                ListView(id="repo_list"),
                 Static("", id="status_bar"),
                 id="content"
             )
@@ -71,81 +128,88 @@ class MainScreen(Screen):
         yield Footer()
 
     async def on_mount(self) -> None:
-        table = self.query_one("#repo_table", DataTable)
-        table.cursor_type = "row"
-        table.add_columns("⭐", "Language", "Name", "Tags", "Description")
         await self.reload_data()
 
     async def reload_data(self) -> None:
         """データを再読み込みして表示を更新します。"""
         await self.reload_tags()
-        self.reload_table()
+        self.reload_list()
 
     async def reload_tags(self) -> None:
         """タグ一覧のみを再構築します。"""
         app_config = self.app.app_config
         with get_db_connection(app_config.db_path) as conn:
             tag_list = self.query_one("#tag_list", ListView)
+            # 現在の選択を保存
+            current_id = None
+            if tag_list.highlighted_child:
+                current_id = tag_list.highlighted_child.id
+
             await tag_list.clear()
             tag_list.append(ListItem(Label(" [All] "), id="tag_all"))
             for tag in repository.get_all_tags(conn):
                 tag_list.append(ListItem(Label(f" {tag} "), id=f"tag_{tag}"))
+            
+            # 選択を復元
+            if current_id:
+                for idx, child in enumerate(tag_list.children):
+                    if child.id == current_id:
+                        tag_list.index = idx
+                        break
 
-    def reload_table(self) -> None:
+    def reload_list(self) -> None:
         """リポジトリ一覧のみを再構築します。"""
         app_config = self.app.app_config
         with get_db_connection(app_config.db_path) as conn:
             repos = repository.get_all_repositories(
-                conn, tag_filter=self.tag_filter, keyword=self.keyword, sort_by=self.sort_by
+                conn, 
+                tag_filter=self.tag_filter, 
+                keyword=self.keyword, 
+                sort_by=self.sort_by,
+                sort_descending=self.sort_descending
             )
-            table = self.query_one("#repo_table", DataTable)
-            table.clear()
+            repo_list = self.query_one("#repo_list", ListView)
+            repo_list.clear()
             for repo in repos:
-                tags = repository.get_tags_for_repo(conn, repo["github_id"])
-                table.add_row(
-                    str(repo["stars"]),
-                    repo["primary_language"] or "-",
-                    repo["full_name"],
-                    ", ".join(tags),
-                    repo["description"] or "",
-                    key=repo["github_id"]
-                )
+                repo["tags_list"] = repository.get_tags_for_repo(conn, repo["github_id"])
+                repo_list.append(RepoItem(repo))
         self._update_status_bar()
 
     def _update_status_bar(self) -> None:
         """ステータスを表示する静的バーを更新します。"""
-        sort_labels = {
-            "stars": "⭐ Stars ▼",
-            "name": "Name ▲",
-            "language": "Language ▲",
-            "starred_at": "Starred At ▼",
+        sort_names = {
+            "stars": "⭐ Stars",
+            "name": "Name",
+            "language": "Language",
+            "starred_at": "Starred At",
         }
-        sort_label = sort_labels.get(self.sort_by, "")
+        direction = "▼" if self.sort_descending else "▲"
+        sort_label = f"{sort_names.get(self.sort_by, '')} {direction}"
         filter_label = f"Filter: {self.tag_filter}" if self.tag_filter else "Filter: [All]"
-        table = self.query_one("#repo_table", DataTable)
-        count_label = f"{table.row_count} items"
+        
+        repo_list = self.query_one("#repo_list", ListView)
+        count_label = f"{len(repo_list.children)} items"
         
         parts = [f"Sort: {sort_label}", filter_label, count_label]
         self.query_one("#status_bar", Static).update(" | ".join(parts))
 
     def on_list_view_selected(self, event: ListView.Selected) -> None:
-        """タグが選択された時の処理。"""
-        if event.item.id == "tag_all":
-            self.tag_filter = None
-        else:
-            self.tag_filter = event.item.id.replace("tag_", "")
-        self.reload_table()
+        """リストが選択された時の処理。"""
+        if event.list_view.id == "tag_list":
+            if event.item.id == "tag_all":
+                self.tag_filter = None
+            else:
+                self.tag_filter = event.item.id.replace("tag_", "")
+            self.reload_list()
+        elif event.list_view.id == "repo_list":
+            if isinstance(event.item, RepoItem):
+                self.app.push_screen(DetailScreen(event.item.repo["github_id"]))
 
     def on_input_changed(self, event: Input.Changed) -> None:
         """検索ワードが変更された時の処理。"""
         if event.input.id == "search_bar":
             self.keyword = event.value if event.value else None
-            self.reload_table()
-
-    def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
-        """リポジトリが選択された時の処理。"""
-        repo_id = event.row_key.value
-        self.app.push_screen(DetailScreen(repo_id))
+            self.reload_list()
 
     def action_random_pick(self) -> None:
         """ランダムにリポジトリを選択して詳細表示。"""
@@ -162,57 +226,73 @@ class MainScreen(Screen):
 
     # Vim-like Navigation
     def action_cursor_down(self) -> None:
-        table = self.query_one("#repo_table", DataTable)
-        if table.cursor_row < table.row_count - 1:
-            table.move_cursor(row=table.cursor_row + 1)
+        if self.focused:
+            self.focused.action_cursor_down()
 
     def action_cursor_up(self) -> None:
-        table = self.query_one("#repo_table", DataTable)
-        if table.cursor_row > 0:
-            table.move_cursor(row=table.cursor_row - 1)
+        if self.focused:
+            self.focused.action_cursor_up()
+
+    def action_scroll_left(self) -> None:
+        if self.focused:
+            self.focused.scroll_relative(x=-4)
+
+    def action_scroll_right(self) -> None:
+        if self.focused:
+            self.focused.scroll_relative(x=4)
 
     def action_cursor_top(self) -> None:
-        self.query_one("#repo_table", DataTable).move_cursor(row=0)
+        if self.focused:
+            if hasattr(self.focused, "index"):
+                self.focused.index = 0
+            else:
+                self.focused.scroll_to(y=0)
 
     def action_cursor_bottom(self) -> None:
-        table = self.query_one("#repo_table", DataTable)
-        if table.row_count > 0:
-            table.move_cursor(row=table.row_count - 1)
+        if self.focused:
+            if isinstance(self.focused, ListView):
+                self.focused.index = len(self.focused.children) - 1
+            else:
+                self.focused.scroll_to(y=self.focused.virtual_size.height)
 
     def action_page_down(self) -> None:
-        table = self.query_one("#repo_table", DataTable)
-        half = max(1, table.size.height // 2)
-        new_row = min(table.cursor_row + half, table.row_count - 1)
-        table.move_cursor(row=new_row)
+        if self.focused:
+            self.focused.scroll_relative(y=self.focused.size.height // 2)
 
     def action_page_up(self) -> None:
-        table = self.query_one("#repo_table", DataTable)
-        half = max(1, table.size.height // 2)
-        new_row = max(0, table.cursor_row - half)
-        table.move_cursor(row=new_row)
+        if self.focused:
+            self.focused.scroll_relative(y=-(self.focused.size.height // 2))
+
+    def action_toggle_sidebar(self) -> None:
+        sidebar = self.query_one("#sidebar")
+        sidebar.display = not sidebar.display
 
     def action_open_detail(self) -> None:
-        table = self.query_one("#repo_table", DataTable)
-        if table.row_count > 0:
-            repo_id = table.coordinate_to_cell_key(Coordinate(table.cursor_row, 0)).row_key.value
-            self.app.push_screen(DetailScreen(repo_id))
+        repo_list = self.query_one("#repo_list", ListView)
+        if repo_list.highlighted_child and isinstance(repo_list.highlighted_child, RepoItem):
+            self.app.push_screen(DetailScreen(repo_list.highlighted_child.repo["github_id"]))
 
     # Sorting
+    def _toggle_sort(self, sort_by: str) -> None:
+        if self.sort_by == sort_by:
+            self.sort_descending = not self.sort_descending
+        else:
+            self.sort_by = sort_by
+            # デフォルトの方向（スターと日時は降順、名前と言語は昇順）
+            self.sort_descending = sort_by in ["stars", "starred_at"]
+        self.reload_list()
+
     def action_sort_stars(self) -> None:
-        self.sort_by = "stars"
-        self.reload_table()
+        self._toggle_sort("stars")
 
     def action_sort_name(self) -> None:
-        self.sort_by = "name"
-        self.reload_table()
+        self._toggle_sort("name")
 
     def action_sort_language(self) -> None:
-        self.sort_by = "language"
-        self.reload_table()
+        self._toggle_sort("language")
 
     def action_sort_starred_at(self) -> None:
-        self.sort_by = "starred_at"
-        self.reload_table()
+        self._toggle_sort("starred_at")
 
     # Shuffle
     def action_shuffle_list(self) -> None:
@@ -223,16 +303,9 @@ class MainScreen(Screen):
                 conn, tag_filter=self.tag_filter, keyword=self.keyword
             )
             random.shuffle(repos)
-            table = self.query_one("#repo_table", DataTable)
-            table.clear()
+            repo_list = self.query_one("#repo_list", ListView)
+            repo_list.clear()
             for repo in repos:
-                tags = repository.get_tags_for_repo(conn, repo["github_id"])
-                table.add_row(
-                    str(repo["stars"]),
-                    repo["primary_language"] or "-",
-                    repo["full_name"],
-                    ", ".join(tags),
-                    repo["description"] or "",
-                    key=repo["github_id"]
-                )
-        self.query_one("#status_bar", Static).update("Sort: 🔀 Shuffled | " + (f"Filter: {self.tag_filter}" if self.tag_filter else "Filter: [All]") + f" | {table.row_count} items")
+                repo["tags_list"] = repository.get_tags_for_repo(conn, repo["github_id"])
+                repo_list.append(RepoItem(repo))
+        self.query_one("#status_bar", Static).update("Sort: 🔀 Shuffled | " + (f"Filter: {self.tag_filter}" if self.tag_filter else "Filter: [All]") + f" | {len(repo_list.children)} items")
