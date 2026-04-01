@@ -12,6 +12,7 @@ class AppConfig:
     llm_endpoint: str
     llm_model: str
     sync_page_size: int
+    tags_config_path: Path
 
 def load_config(config_path: str = "config.yaml") -> AppConfig:
     """設定をロードします。優先順位: 環境変数 > .env > config.yaml"""
@@ -23,6 +24,7 @@ def load_config(config_path: str = "config.yaml") -> AppConfig:
         "database": {"path": "./data/gh_favorite.db"},
         "tagger": {
             "mode": "rule_based",
+            "tags_config_path": "config/tags.yaml",
             "llm_endpoint": "http://localhost:11434",
             "llm_model": "gemma3"
         },
@@ -51,5 +53,6 @@ def load_config(config_path: str = "config.yaml") -> AppConfig:
         tagger_mode=config_dict["tagger"]["mode"],
         llm_endpoint=config_dict["tagger"]["llm_endpoint"],
         llm_model=config_dict["tagger"]["llm_model"],
-        sync_page_size=config_dict["sync"]["page_size"]
+        sync_page_size=config_dict["sync"]["page_size"],
+        tags_config_path=Path(config_dict["tagger"]["tags_config_path"])
     )

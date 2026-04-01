@@ -7,6 +7,7 @@
 - `packages/collector`: データ収集担当。GitHub GraphQL APIとの通信、同期ロジック。
 - `packages/processor`: データ処理担当。SQLite DB管理、タグ付けエンジン(Strategy)、類似検索エンジン(Strategy)。
 - `packages/tui`: インターフェース担当。TextualによるUI実装、設定管理、CLIエントリポイント。
+- `config/tags.yaml`: タグ付けルール定義ファイル（ユーザー編集可能）。
 
 ## クラス図 (コアロジック)
 
@@ -41,6 +42,7 @@ classDiagram
     SyncEngine --> Repository
     SyncEngine --> TaggerStrategy
     TaggerStrategy <|-- RuleBasedTagger
+    RuleBasedTagger ..> "tags.yaml" : 読み込み
 ```
 
 ## DBスキーマ (ER図)

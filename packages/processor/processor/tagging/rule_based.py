@@ -1,55 +1,47 @@
+import yaml
+from pathlib import Path
 from .base import TaggerStrategy
 
 class RuleBasedTagger(TaggerStrategy):
-    """キーワードマッチングに基づくルールベースのタグ付け。"""
+    """tags.yaml を読み込んでルールベースのタグ付けを行う。"""
+
+    def __init__(self, tags_config_path: Path = Path("config/tags.yaml")):
+        self.rules: list[dict] = []
+        self.default_tag: str = "other"
+        self._load_config(tags_config_path)
+
+    def _load_config(self, path: Path) -> None:
+        """YAML設定ファイルを読み込む。ファイルが存在しない場合はデフォルトルールを使用。"""
+        if not path.exists():
+            self.rules = []
+            self.default_tag = "other"
+            return
+        with open(path, "r", encoding="utf-8") as f:
+            config = yaml.safe_load(f)
+            if config:
+                self.rules = config.get("rules", [])
+                self.default_tag = config.get("default_tag", "other")
 
     def suggest_tags(self, repo: dict) -> list[str]:
         tags = set()
-        
-        # 1. 言語による判定
-        lang = (repo.get("primary_language") or "").lower()
-        if lang == "python":
-            tags.add("python")
-        elif lang in ["typescript", "javascript"]:
-            tags.add("javascript")
-        elif lang == "rust":
-            tags.add("rust")
-        elif lang == "go":
-            tags.add("go")
-
-        # 2. キーワードによる判定 (topics, description)
+        lang = (repo.get("primary_language") or "").strip()
         description = (repo.get("description") or "").lower()
         topics = [t.lower() for t in (repo.get("topics") or [])]
-        
         combined_text = description + " " + " ".join(topics)
-        
-        # CLI関連
-        if any(kw in combined_text for kw in ["cli", "terminal", "tui", "command-line"]):
-            tags.add("cli")
-            
-        # Frontend関連
-        if any(kw in combined_text for kw in ["web", "frontend", "react", "vue", "svelte", "nextjs"]):
-            tags.add("frontend")
-            
-        # AI/ML関連
-        if any(kw in combined_text for kw in ["machine-learning", "ml", "ai", "llm", "neural-network", "deep-learning", "pytorch", "tensorflow"]):
-            tags.add("ai-ml")
-            
-        # Database関連
-        if any(kw in combined_text for kw in ["database", "sql", "orm", "postgres", "sqlite", "redis", "mongodb"]):
-            tags.add("database")
-            
-        # DevOps/Infra関連
-        if any(kw in combined_text for kw in ["infra", "devops", "docker", "kubernetes", "k8s", "terraform", "ansible", "cloud"]):
-            tags.add("devops")
-            
-        # API関連
-        if any(kw in combined_text for kw in ["api", "rest", "graphql", "grpc", "http"]):
-            tags.add("api")
+
+        for rule in self.rules:
+            tag = rule["tag"]
+            match = rule.get("match", {})
+            # 言語マッチ
+            if "language" in match and lang in match["language"]:
+                tags.add(tag)
+            # キーワードマッチ
+            if "keywords" in match:
+                if any(kw in combined_text for kw in match["keywords"]):
+                    tags.add(tag)
 
         if not tags:
-            tags.add("other")
-            
+            tags.add(self.default_tag)
         return sorted(list(tags))
 
     def learn(self, repo: dict, correct_tags: list[str]) -> None:

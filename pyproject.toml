@@ -18,8 +18,8 @@ collector = { workspace = true }
 processor = { workspace = true }
 tui = { workspace = true }
 
-[tool.uv]
-dev-dependencies = [
+[dependency-groups]
+dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.23.0",
     "respx>=0.21.0",

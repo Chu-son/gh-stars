@@ -3,6 +3,7 @@ from textual.app import ComposeResult
 from textual.screen import Screen
 from textual.widgets import Header, Footer, Markdown, Label, Static, Button
 from textual.containers import Vertical, Horizontal
+from textual.binding import Binding
 from processor.database import repository
 from processor.database.connection import get_db_connection
 from .tag_edit_modal import TagEditModal
@@ -23,6 +24,13 @@ class DetailScreen(Screen):
         margin-right: 2;
     }
     """
+
+    BINDINGS = [
+        Binding("h", "go_back", "Back", show=False),
+        Binding("escape", "go_back", "Back", show=False),
+        Binding("o", "open_browser", "Open Browser", show=False),
+        Binding("t", "edit_tags", "Edit Tags", show=False),
+    ]
 
     def __init__(self, repo_id: str):
         super().__init__()
@@ -95,3 +103,7 @@ class DetailScreen(Screen):
             for screen in self.app.screen_stack:
                 if hasattr(screen, "reload_data"):
                     screen.reload_data()
+
+    def action_go_back(self) -> None:
+        """メイン画面に戻ります。"""
+        self.app.pop_screen()

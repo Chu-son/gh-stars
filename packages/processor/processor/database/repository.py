@@ -25,8 +25,15 @@ def upsert_repository(conn: sqlite3.Connection, repo: dict) -> None:
         
     conn.execute(query, data)
 
+SORT_COLUMNS = {
+    "stars":      "r.stars DESC",
+    "name":       "r.full_name ASC",
+    "language":   "r.primary_language ASC NULLS LAST",
+    "starred_at": "r.starred_at DESC",
+}
+
 def get_all_repositories(conn: sqlite3.Connection, tag_filter: str | None = None,
-                         keyword: str | None = None) -> list[dict]:
+                         keyword: str | None = None, sort_by: str = "starred_at") -> list[dict]:
     """リポジトリ一覧を取得します。"""
     query = "SELECT r.* FROM repositories r"
     params = {}
@@ -45,16 +52,38 @@ def get_all_repositories(conn: sqlite3.Connection, tag_filter: str | None = None
     if where_clauses:
         query += " WHERE " + " AND ".join(where_clauses)
     
-    query += " ORDER BY r.starred_at DESC"
+    order_clause = SORT_COLUMNS.get(sort_by, SORT_COLUMNS["starred_at"])
+    query += f" ORDER BY {order_clause}"
     
     cursor = conn.execute(query, params)
     return [dict(row) for row in cursor.fetchall()]
 
 def get_repository_by_id(conn: sqlite3.Connection, github_id: str) -> dict | None:
-    """ID指定でリポジトリを取得します。"""
+    """ID\u6307\u5b9a\u3067\u30ea\u30dd\u30b8\u30c8\u30ea\u3092\u53d6\u5fb7\u3059\u308b\u3002"""
     query = "SELECT * FROM repositories WHERE github_id = ?"
     row = conn.execute(query, (github_id,)).fetchone()
     return dict(row) if row else None
+
+def get_all_repositories_for_retagging(conn: sqlite3.Connection) -> list[dict]:
+    """\u518d\u30bf\u30b0\u4ed8\u3051\u5c02\u7528: topics \u3092 list[str] \u306b\u30c7\u30b7\u30ea\u30a2\u30e9\u30a4\u30ba\u3057\u3066\u5168\u30ea\u30dd\u30b8\u30c8\u30ea\u3092\u8fd4\u3059\u3002
+    
+    \u901a\u5e38\u306e get_all_repositories() \u306f topics \u3092 str \u306e\u307e\u307e\u8fd4\u3059\u305f\u3081\u3001
+    \u30bf\u30ac\u30fc\u306b\u6e21\u3059\u524d\u306e\u578b\u5909\u63db\u304c\u5fc5\u8981\u306a\u5b34\u5408\u306b\u3053\u306e\u95a2\u6570\u3092\u4f7f\u3046\u3002
+    """
+    cursor = conn.execute("SELECT * FROM repositories")
+    repos = []
+    for row in cursor.fetchall():
+        repo = dict(row)
+        # topics \u306f JSON \u6587\u5b57\u5217 \u2192 list[str] \u306b\u5909\u63db
+        if isinstance(repo.get("topics"), str):
+            try:
+                repo["topics"] = json.loads(repo["topics"])
+            except (json.JSONDecodeError, TypeError):
+                repo["topics"] = []
+        else:
+            repo["topics"] = []
+        repos.append(repo)
+    return repos
 
 def get_random_repository(conn: sqlite3.Connection, tag_filter: str | None = None) -> dict | None:
     """ランダムにリポジトリを1つ取得します。"""

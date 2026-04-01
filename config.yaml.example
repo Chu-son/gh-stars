@@ -3,6 +3,7 @@ database:
 
 tagger:
   mode: rule_based               # rule_based | ml | llm
+  tags_config_path: config/tags.yaml
   llm_endpoint: http://localhost:11434
   llm_model: gemma3
 
