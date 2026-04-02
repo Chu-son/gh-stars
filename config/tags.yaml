@@ -1,0 +1,61 @@
+# タグ付けルール設定ファイル
+# rules: タグ付けルールのリスト
+# - tag: 付与するタグ名
+#   match:
+#     language: プライマリ言語名のリスト（いずれかに一致で適用）
+#     keywords: キーワードのリスト（description + topics に含まれる場合に適用）
+# default_tag: どのルールにもマッチしない場合に付与されるタグ
+
+rules:
+  - tag: python
+    match:
+      language: [Python]
+  - tag: javascript
+    match:
+      language: [TypeScript, JavaScript]
+  - tag: rust
+    match:
+      language: [Rust]
+  - tag: go
+    match:
+      language: [Go]
+  - tag: ai-ml
+    match:
+      keywords:
+        [
+          machine-learning,
+          ml,
+          ai,
+          llm,
+          neural-network,
+          deep-learning,
+          pytorch,
+          tensorflow,
+        ]
+  - tag: cli
+    match:
+      keywords: [cli, terminal, tui, command-line]
+  - tag: frontend
+    match:
+      keywords: [web, frontend, react, vue, svelte, nextjs]
+  - tag: devops
+    match:
+      keywords:
+        [infra, devops, docker, kubernetes, k8s, terraform, ansible, cloud]
+  - tag: database
+    match:
+      keywords: [database, sql, orm, postgres, sqlite, redis, mongodb]
+  - tag: api
+    match:
+      keywords: [api, rest, graphql, grpc, http]
+  - tag: robotics
+    match:
+      keywords: [robotics, ros, autonomous, drone, robot]
+  - tag: ros
+    match:
+      keywords: [ros, robot-operating-system]
+  - tag: ros2
+    match:
+      keywords: [ros2, robot-operating-system-2]
+
+default_tag: other

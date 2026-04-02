@@ -5,10 +5,15 @@ from .base import TaggerStrategy
 class RuleBasedTagger(TaggerStrategy):
     """tags.yaml を読み込んでルールベースのタグ付けを行う。"""
 
-    def __init__(self, tags_config_path: Path = Path("config/tags.yaml")):
+    def __init__(self, tags_config_path: Path = Path("config/tags.yaml"), status_text: str = "Rule-Based"):
         self.rules: list[dict] = []
         self.default_tag: str = "other"
+        self._status_text = status_text
         self._load_config(tags_config_path)
+
+    @property
+    def status_text(self) -> str:
+        return self._status_text
 
     def _load_config(self, path: Path) -> None:
         """YAML設定ファイルを読み込む。ファイルが存在しない場合はデフォルトルールを使用。"""

@@ -13,6 +13,7 @@ class AppConfig:
     llm_model: str
     sync_page_size: int
     tags_config_path: Path
+    ml_model_path: Path
 
 def load_config(config_path: str = "config.yaml") -> AppConfig:
     """設定をロードします。優先順位: 環境変数 > .env > config.yaml"""
@@ -26,7 +27,8 @@ def load_config(config_path: str = "config.yaml") -> AppConfig:
             "mode": "rule_based",
             "tags_config_path": "config/tags.yaml",
             "llm_endpoint": "http://localhost:11434",
-            "llm_model": "gemma3"
+            "llm_model": "gemma3",
+            "ml_model_path": "~/.local/share/gh_stars/ml_model.pkl"
         },
         "sync": {"page_size": 100}
     }
@@ -54,5 +56,6 @@ def load_config(config_path: str = "config.yaml") -> AppConfig:
         llm_endpoint=config_dict["tagger"]["llm_endpoint"],
         llm_model=config_dict["tagger"]["llm_model"],
         sync_page_size=config_dict["sync"]["page_size"],
-        tags_config_path=Path(config_dict["tagger"]["tags_config_path"])
+        tags_config_path=Path(config_dict["tagger"]["tags_config_path"]),
+        ml_model_path=Path(config_dict["tagger"]["ml_model_path"]).expanduser()
     )

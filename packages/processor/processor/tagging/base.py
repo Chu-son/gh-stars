@@ -26,3 +26,8 @@ class TaggerStrategy(ABC):
             correct_tags (list[str]): 正解のタグ名リスト
         """
         pass
+    @property
+    @abstractmethod
+    def status_text(self) -> str:
+        """現在のタガーの状態を示す文字列を返します。"""
+        pass

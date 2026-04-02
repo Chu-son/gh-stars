@@ -1,6 +1,8 @@
 from textual.app import ComposeResult
 from textual.screen import Screen
-from textual.widgets import Header, Footer, ListView, ListItem, Input, Label, Static
+from textual.widgets import Header, Footer, ListView, ListItem, Label, Static
+from ..components.repo_item import RepoItem
+from ..components.search_input import SearchInput
 from textual.containers import Horizontal, Vertical, Container
 from textual.binding import Binding
 from textual.coordinate import Coordinate
@@ -12,41 +14,6 @@ from .detail_screen import DetailScreen
 from rich.text import Text
 from rich.console import Group, RenderableType
 
-class RepoItem(ListItem):
-    """Custom ListItem to display repository information efficiently in one DOM node."""
-    
-    def __init__(self, repo: dict):
-        super().__init__()
-        self.repo = repo
-
-    def render(self) -> RenderableType:
-        """Render the item using Rich for maximum performance."""
-        # Line 1: Stars | Repo Name [Language]
-        title_text = Text(f"⭐ {self.repo['stars']} | {self.repo['full_name']}", style="bold cyan")
-        if self.repo['primary_language']:
-            title_text.append(f" [{self.repo['primary_language']}]", style="green")
-        
-        renderables = [title_text]
-        
-        # Line 2: Tags
-        tags = self.repo.get("tags_list", [])
-        if tags:
-            renderables.append(Text(f"Tags: {', '.join(tags)}", style="italic dim"))
-            
-        # Line 3: Description
-        desc = self.repo.get("description", "")
-        if desc:
-            renderables.append(Text(desc))
-            
-        return Group(*renderables)
-
-    DEFAULT_CSS = """
-    RepoItem {
-        padding: 1;
-        border-bottom: solid $accent;
-        height: auto;
-    }
-    """
 
 class FilterItem(ListItem):
     """タグや言語のフィルタ用ListItem。"""
@@ -114,7 +81,7 @@ class MainScreen(Screen):
                 id="sidebar"
             ),
             Vertical(
-                Input(placeholder="Search by keyword...", id="search_bar"),
+                SearchInput(placeholder="Search by keyword...", id="search_bar"),
                 ListView(id="repo_list"),
                 Static("", id="status_bar"),
                 id="content"
@@ -202,7 +169,11 @@ class MainScreen(Screen):
         if self.language_filter: filter_parts.append(f"Lang:{self.language_filter}")
         filter_label = f"Filter: {' & '.join(filter_parts)}" if filter_parts else "Filter: [All]"
         
-        parts = [f"Sort: {sort_label}", filter_label, count_label]
+        from processor.tagging import create_tagger
+        tagger = create_tagger(self.app.app_config.tagger_mode, self.app.app_config)
+        tagger_label = f"Tagger: {tagger.status_text}"
+        
+        parts = [f"Sort: {sort_label}", filter_label, count_label, tagger_label]
         self.query_one("#status_bar", Static).update(" | ".join(parts))
 
     def on_list_view_selected(self, event: ListView.Selected) -> None:
@@ -224,7 +195,7 @@ class MainScreen(Screen):
             if isinstance(event.item, RepoItem):
                 self.app.push_screen(DetailScreen(event.item.repo["github_id"]))
 
-    def on_input_changed(self, event: Input.Changed) -> None:
+    def on_input_changed(self, event: SearchInput.Changed) -> None:
         """検索ワードが変更された時の処理。"""
         if event.input.id == "search_bar":
             self.keyword = event.value if event.value else None
@@ -241,7 +212,10 @@ class MainScreen(Screen):
                 self.notify("No repositories found.")
 
     def action_focus_search(self) -> None:
-        self.query_one("#search_bar", Input).focus()
+        """検索バーにフォーカスを当てます。/ キーで呼び出される想定です。"""
+        search_input = self.query_one("#search_bar", SearchInput)
+        search_input.can_focus = True
+        search_input.focus()
 
     # Vim-like Navigation
     def action_cursor_down(self) -> None:

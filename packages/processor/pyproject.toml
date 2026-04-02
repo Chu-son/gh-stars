@@ -5,6 +5,9 @@ description = "GitHub Star Data Processor (DB/Taggger/Search)"
 requires-python = ">=3.12"
 dependencies = []
 
+[project.optional-dependencies]
+ml = ["scikit-learn>=1.4"]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

@@ -1,11 +1,14 @@
 database:
-  path: ./data/gh_favorite.db
+  path: ./data/gh_stars.db
 
 tagger:
-  mode: rule_based               # rule_based | ml | llm
+  mode: rule_based               # rule_based | ml
   tags_config_path: config/tags.yaml
-  llm_endpoint: http://localhost:11434
-  llm_model: gemma3
+  ml_model_path: ~/.local/share/gh_stars/ml_model.pkl
+
+  # Phase 3: LLM Settings
+  # llm_endpoint: http://localhost:11434
+  # llm_model: gemma3
 
 sync:
   page_size: 100

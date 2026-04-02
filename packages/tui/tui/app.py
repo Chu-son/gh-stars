@@ -22,8 +22,13 @@ class GhFavoriteApp(App):
         ("o", "open_browser", "Open"),
         ("/", "focus_search", "Search"),
         ("t", "edit_tags", "Tags"),
+        ("?", "show_help", "Help"),
         ("escape", "go_back", "Back"),
     ]
+    
+    def action_show_help(self) -> None:
+        from .screens.help_modal import HelpModal
+        self.push_screen(HelpModal())
 
     def __init__(self, config):
         super().__init__()
@@ -36,57 +41,58 @@ class GhFavoriteApp(App):
         self.push_screen(MainScreen())
 
     async def action_sync_incremental(self) -> None:
-        # 非同期で同期処理を呼び出す（UIをブロックしないためには工夫が必要だが今回はシンプルに）
         from collector.github_client import GitHubClient
         from collector.sync import incremental_sync
-        from processor.tagging.rule_based import RuleBasedTagger
+        from processor.tagging import create_tagger
+        from .screens.progress_modal import ProgressModal
         
-        self.notify("Starting incremental sync...")
+        self.push_screen(ProgressModal("Syncing incremental data..."))
         client = GitHubClient(self.app_config.github_pat, self.app_config.sync_page_size)
-        tagger = RuleBasedTagger(tags_config_path=self.app_config.tags_config_path)
+        tagger = create_tagger(self.app_config.tagger_mode, self.app_config)
         
         try:
             with get_db_connection(self.app_config.db_path) as conn:
                 count = await incremental_sync(client, conn, tagger)
-            self.notify(f"Synced {count} repositories.")
-            # メイン画面のリロードを通知
+            self.notify(f"Synced {count} repositories. (Tagger: {tagger.status_text})")
             screen = self.screen
             if isinstance(screen, MainScreen):
                 screen.reload_data()
         except Exception as e:
             self.notify(f"Sync failed: {str(e)}", severity="error")
+        finally:
+            self.pop_screen()
 
     async def action_sync_full(self) -> None:
         from collector.github_client import GitHubClient
         from collector.sync import full_sync
-        from processor.tagging.rule_based import RuleBasedTagger
+        from processor.tagging import create_tagger
+        from .screens.progress_modal import ProgressModal
         
-        self.notify("Starting full sync...")
+        self.push_screen(ProgressModal("Syncing ALL starred repositories..."))
         client = GitHubClient(self.app_config.github_pat, self.app_config.sync_page_size)
-        tagger = RuleBasedTagger(tags_config_path=self.app_config.tags_config_path)
+        tagger = create_tagger(self.app_config.tagger_mode, self.app_config)
         
         try:
             with get_db_connection(self.app_config.db_path) as conn:
                 count = await full_sync(client, conn, tagger)
-            self.notify(f"Full sync completed: {count} repositories.")
+            self.notify(f"Full sync completed: {count} repositories. (Tagger: {tagger.status_text})")
             screen = self.screen
             if isinstance(screen, MainScreen):
                 screen.reload_data()
         except Exception as e:
             self.notify(f"Full sync failed: {str(e)}", severity="error")
+        finally:
+            self.pop_screen()
 
     async def action_re_tag_all(self) -> None:
-        """\u30ed\u30fc\u30ab\u30eb DB \u306e\u5168\u30ea\u30dd\u30b8\u30c8\u30ea\u306b\u73fe\u5728\u306e tags.yaml \u3092\u518d\u9029\u7528\u3059\u308b\u3002
-
-        GitHub API \u306f\u547c\u3070\u306a\u3044\u3002source='auto' \u306e\u30bf\u30b0\u306e\u307f\u66f4\u65b0\u3057\u3001
-        source='manual' \u306e\u30bf\u30b0\u306f\u4fdd\u6301\u3059\u308b\u3002
-        """
-        from processor.tagging.rule_based import RuleBasedTagger
+        """ローカル DB の全リポジトリに現在の tags.yaml または学習済みモデルを再適用する。"""
+        from processor.tagging import create_tagger
         from processor.database import repository
         from .screens.main_screen import MainScreen
+        from .screens.progress_modal import ProgressModal
 
-        self.notify("Re-tagging all repositories...")
-        tagger = RuleBasedTagger(tags_config_path=self.app_config.tags_config_path)
+        self.push_screen(ProgressModal("Re-tagging all repositories locally..."))
+        tagger = create_tagger(self.app_config.tagger_mode, self.app_config)
 
         try:
             with get_db_connection(self.app_config.db_path) as conn:
@@ -99,7 +105,7 @@ class GhFavoriteApp(App):
                 conn.commit()
 
             count = len(repos)
-            self.notify(f"Re-tagging complete: {count} repositories updated.")
+            self.notify(f"Re-tagging complete: {count} repositories updated. (Tagger: {tagger.status_text})")
 
             screen = self.screen
             if isinstance(screen, MainScreen):
@@ -107,6 +113,8 @@ class GhFavoriteApp(App):
 
         except Exception as e:
             self.notify(f"Re-tagging failed: {str(e)}", severity="error")
+        finally:
+            self.pop_screen()
 
     def action_random_pick(self) -> None:
         screen = self.screen

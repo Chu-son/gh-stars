@@ -1,8 +1,9 @@
 import webbrowser
 from textual.app import ComposeResult
 from textual.screen import Screen
-from textual.widgets import Header, Footer, Markdown, Label, Static, Button
-from textual.containers import Vertical, Horizontal
+from textual.widgets import Header, Footer, Markdown, Label, Static, Button, ListView
+from textual.containers import Vertical, Horizontal, Container, VerticalScroll
+from ..components.repo_item import RepoItem
 from textual.binding import Binding
 from processor.database import repository
 from processor.database.connection import get_db_connection
@@ -15,9 +16,23 @@ class DetailScreen(Screen):
     #detail_content {
         padding: 2;
         background: $surface;
+        height: 1fr;
+    }
+    #repo_markdown {
+        height: auto;
+        margin-bottom: 1;
+    }
+    #similar_section {
+        height: auto;
+        margin-top: 2;
+        border-top: tall $accent;
+    }
+    #similar_list {
+        height: auto;
+        min-height: 5;
     }
     #actions {
-        margin-top: 2;
+        margin-top: 1;
         height: 3;
     }
     Button {
@@ -45,8 +60,11 @@ class DetailScreen(Screen):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        with Vertical(id="detail_content"):
+        with VerticalScroll(id="detail_content"):
             yield Markdown(id="repo_markdown")
+            with Vertical(id="similar_section"):
+                yield Label("### Similar Repositories", id="similar_title")
+                yield ListView(id="similar_list")
             with Horizontal(id="actions"):
                 yield Button("Open in Browser (o)", id="open_btn", variant="primary")
                 yield Button("Edit Tags (t)", id="edit_tags_btn")
@@ -82,7 +100,37 @@ class DetailScreen(Screen):
 **URL:** [{repo['url']}]({repo['url']})
 **Starred at:** {repo['starred_at']}
 """
+            # 類似リポジトリ表示を追加
+            from processor.search import create_search
+            searcher = create_search(conn)
+            
+            similar_list = self.query_one("#similar_list", ListView)
+            similar_list.clear()
+            title = self.query_one("#similar_title", Label)
+            
+            if searcher:
+                try:
+                    similar = searcher.find_similar(self.repo_id, top_k=5)
+                    if similar:
+                        title.update("### Similar Repositories")
+                        for r in similar:
+                            # タグ情報も取得しておく
+                            r["tags_list"] = repository.get_tags_for_repo(conn, r["github_id"])
+                            similar_list.append(RepoItem(r))
+                    else:
+                        title.update("### Similar Repositories (None found)")
+                except Exception as e:
+                    title.update(f"### Similar Repositories (Error: {str(e)})")
+            else:
+                title.update("### Similar Repositories (ML dependency missing)")
+
             self.query_one("#repo_markdown", Markdown).update(md_content)
+
+    def on_list_view_selected(self, event: ListView.Selected) -> None:
+        """類似リポジトリが選択されたらその詳細画面へ遷移する。"""
+        if event.list_view.id == "similar_list":
+            if isinstance(event.item, RepoItem):
+                self.app.push_screen(DetailScreen(event.item.repo["github_id"]))
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "open_btn":

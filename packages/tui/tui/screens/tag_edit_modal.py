@@ -113,6 +113,15 @@ class TagEditModal(ModalScreen[bool]):
             # 既存の全タグと比較して差分を記録する等のこだわりも可能だが、
             # 今回は repository.py の方針に従い manual ソースで一括更新
             repository.set_tags_for_repo(conn, self.repo_id, list(self.selected_tags), source='manual')
+            
+            # ML モードの場合は学習を回す
+            if app_config.tagger_mode == "ml":
+                from processor.tagging import create_tagger
+                repo = repository.get_repository_by_id(conn, self.repo_id)
+                if repo:
+                    tagger = create_tagger(app_config.tagger_mode, app_config)
+                    tagger.learn(repo, list(self.selected_tags))
+            
             conn.commit()
         self.dismiss(True)
 
