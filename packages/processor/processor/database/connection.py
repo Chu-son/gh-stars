@@ -1,4 +1,8 @@
 import sqlite3
+try:
+    import sqlite_vec
+except ImportError:
+    sqlite_vec = None
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -12,6 +16,11 @@ def get_db_connection(db_path: str | Path):
     db_path.parent.mkdir(parents=True, exist_ok=True)
     
     conn = sqlite3.connect(db_path)
+    # sqlite-vec 拡張をロード
+    if sqlite_vec:
+        conn.enable_load_extension(True)
+        sqlite_vec.load(conn)
+    
     # 辞書形式で結果を取得できるように設定
     conn.row_factory = sqlite3.Row
     

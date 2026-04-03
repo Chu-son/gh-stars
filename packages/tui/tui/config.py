@@ -27,7 +27,7 @@ def load_config(config_path: str = "config.yaml") -> AppConfig:
             "mode": "rule_based",
             "tags_config_path": "config/tags.yaml",
             "llm_endpoint": "http://localhost:11434",
-            "llm_model": "gemma3",
+            "llm_model": "llama3.2",
             "ml_model_path": "~/.local/share/gh_stars/ml_model.pkl"
         },
         "sync": {"page_size": 100}

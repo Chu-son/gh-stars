@@ -102,7 +102,11 @@ class DetailScreen(Screen):
 """
             # 類似リポジトリ表示を追加
             from processor.search import create_search
-            searcher = create_search(conn)
+            searcher = create_search(
+                app_config.db_path, 
+                mode=app_config.tagger_mode, 
+                conn=conn
+            )
             
             similar_list = self.query_one("#similar_list", ListView)
             similar_list.clear()

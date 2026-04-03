@@ -29,6 +29,8 @@ def main():
     parser.add_argument("--sync", action="store_true", help="差分同期を実行してから起動")
     parser.add_argument("--sync-full", action="store_true", help="全件同期を実行してから起動")
     parser.add_argument("--sync-only", action="store_true", help="同期のみ実行して終了")
+    parser.add_argument("--setup-llm", action="store_true", help="ローカルLLM(Ollama)のセットアップを実行して終了")
+    parser.add_argument("--rebuild-vec", action="store_true", help="ベクトル検索用インデックスを再構築して終了")
     parser.add_argument("--config", default="config.yaml", help="設定ファイルのパス")
     
     args = parser.parse_args()
@@ -37,6 +39,20 @@ def main():
     if not config.github_pat and (args.sync or args.sync_full or args.sync_only):
         print("Error: GITHUB_PAT is not set. Please set it in .env or environment variable.")
         sys.exit(1)
+
+    if args.setup_llm:
+        from processor.tagging.llm_setup import run_setup
+        asyncio.run(run_setup(config))
+        return
+
+    if args.rebuild_vec:
+        from processor.search import create_search
+        searcher = create_search(config.db_path, mode="llm")
+        if searcher:
+            searcher.rebuild_index()
+        else:
+            print("Error: Could not create search indexer.")
+        return
 
     if args.sync or args.sync_full or args.sync_only:
         asyncio.run(run_sync(config, full=args.sync_full))

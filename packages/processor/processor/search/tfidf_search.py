@@ -6,8 +6,8 @@ from processor.database.repository import get_all_repositories_for_retagging
 class TfidfSearch(SimilaritySearchStrategy):
     """TF-IDF とコサイン類似度を用いた類似リポジトリ検索。"""
 
-    def __init__(self, conn):
-        self.conn = conn
+    def __init__(self, db_path: str):
+        self.db_path = db_path
         self.vectorizer = TfidfVectorizer(stop_words='english')
         self.tfidf_matrix = None
         # リポジトリ情報のリスト (インデックスによる引き当て用)
@@ -17,9 +17,11 @@ class TfidfSearch(SimilaritySearchStrategy):
 
     def rebuild_index(self) -> None:
         """データベースから全件読み込んでインデックスを構築します。"""
-        # repository.py の get_all_repositories_for_retagging を使用
-        # (すでに topics が JSON デコードされているため)
-        self.repo_list = get_all_repositories_for_retagging(self.conn)
+        from processor.database.connection import get_db_connection
+        with get_db_connection(self.db_path) as conn:
+            # repository.py の get_all_repositories_for_retagging を使用
+            # (すでに topics が JSON デコードされているため)
+            self.repo_list = get_all_repositories_for_retagging(conn)
         texts = []
         self.repo_id_to_idx = {}
         

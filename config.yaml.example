@@ -2,13 +2,16 @@ database:
   path: ./data/gh_stars.db
 
 tagger:
-  mode: rule_based               # rule_based | ml
+  mode: rule_based               # rule_based | ml | llm
   tags_config_path: config/tags.yaml
   ml_model_path: ~/.local/share/gh_stars/ml_model.pkl
 
   # Phase 3: LLM Settings
-  # llm_endpoint: http://localhost:11434
-  # llm_model: gemma3
+  llm_endpoint: http://localhost:11434
+  # 用途やマシンスペックに合わせて以下のいずれかのコメントを外してください
+  # llm_model: gemma:2b         # [軽量] 応答速度・省メモリ重視
+  llm_model: llama3.2           # [中規模] (デフォルト) 速度と精度のバランス
+  # llm_model: command-r-7b     # [大規模] 高い文脈理解性能を重視
 
 sync:
   page_size: 100
