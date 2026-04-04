@@ -80,7 +80,7 @@ class EmbeddingSearchStrategy(SimilaritySearchStrategy):
         """任意の文章から意味的に近いリポジトリを返します。"""
         try:
             # 1. 問い合わせ文をベクトル化
-            query_embedding = self.model.encode(query_text).astype(np.float32).tobytes()
+            query_embedding = self.model.encode(query_text, show_progress_bar=False).astype(np.float32).tobytes()
             
             from processor.database.connection import get_db_connection
             with get_db_connection(self.db_path) as conn:
@@ -116,7 +116,7 @@ class EmbeddingSearchStrategy(SimilaritySearchStrategy):
                 
                 # 一括エンコード
                 print(f"Encoding {len(repos)} repositories...")
-                embeddings = self.model.encode(texts)
+                embeddings = self.model.encode(texts, show_progress_bar=False)
                 
                 # DB に保存
                 print("Saving embeddings to database...")

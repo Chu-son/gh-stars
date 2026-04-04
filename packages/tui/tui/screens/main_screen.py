@@ -7,6 +7,7 @@ from textual.containers import Horizontal, Vertical, Container
 from textual.binding import Binding
 from textual.coordinate import Coordinate
 from textual.message import Message
+from textual import work
 import random
 from processor.database import repository
 from processor.database.connection import get_db_connection
@@ -205,6 +206,27 @@ class MainScreen(Screen):
             self.keyword = val if val else None
             self.reload_list()
 
+    @work(thread=True)
+    def _do_semantic_search(self, query: str) -> None:
+        """非同期にセマンティック検索を実行します。"""
+        from processor.search import create_search
+        search_engine = create_search(self.app.app_config.db_path, self.app.app_config.tagger_mode)
+        if hasattr(search_engine, "find_similar_by_text"):
+            repos = search_engine.find_similar_by_text(query)
+            self.app.call_from_thread(self._update_repo_list_after_search, repos, query)
+        else:
+            self.app.call_from_thread(self.notify, "Semantic search is not supported in current mode.", severity="warning")
+
+    def _update_repo_list_after_search(self, repos: list, query: str) -> None:
+        """検索結果でリストを更新します。（メインスレッド用）"""
+        repo_list = self.query_one("#repo_list", ListView)
+        repo_list.clear()
+        with get_db_connection(self.app.app_config.db_path) as conn:
+            for repo in repos:
+                repo["tags_list"] = repository.get_tags_for_repo(conn, repo["github_id"])
+                repo_list.append(RepoItem(repo))
+        self.query_one("#status_bar", Static).update(f"Sort: 🧠 Semantic Result | Search: {query} | {len(repos)} items")
+
     async def on_input_submitted(self, event: SearchInput.Submitted) -> None:
         """Enterキーが押された時の処理。自由文検索に使用。"""
         if event.input.id == "search_bar":
@@ -213,21 +235,9 @@ class MainScreen(Screen):
                 query = val[1:].strip()
                 if not query:
                     return
-                # 自由文検索を実行
-                from processor.search import create_search
-                search_engine = create_search(self.app.app_config.db_path, self.app.app_config.tagger_mode)
-                if hasattr(search_engine, "find_similar_by_text"):
-                    self.notify(f"Semantic searching for: '{query}'...")
-                    repos = search_engine.find_similar_by_text(query)
-                    repo_list = self.query_one("#repo_list", ListView)
-                    repo_list.clear()
-                    with get_db_connection(self.app.app_config.db_path) as conn:
-                        for repo in repos:
-                            repo["tags_list"] = repository.get_tags_for_repo(conn, repo["github_id"])
-                            repo_list.append(RepoItem(repo))
-                    self.query_one("#status_bar", Static).update(f"Sort: 🧠 Semantic Result | Search: {query} | {len(repos)} items")
-                else:
-                    self.notify("Semantic search is not supported in current mode.", severity="warning")
+                # 自由文検索を実行 (ワーカーにオフロード)
+                self.notify(f"Semantic searching for: '{query}'...")
+                self._do_semantic_search(query)
 
     def action_random_pick(self) -> None:
         """ランダムにリポジトリを選択して詳細表示。"""

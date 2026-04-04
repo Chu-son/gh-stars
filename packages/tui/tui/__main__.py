@@ -1,6 +1,8 @@
 import argparse
 import asyncio
 import sys
+import logging
+from textual.logging import TextualHandler
 from .config import load_config
 from .app import GhFavoriteApp
 from collector.github_client import GitHubClient
@@ -25,6 +27,7 @@ async def run_sync(config, full=False):
         print(f"Synced {count} repositories.")
 
 def main():
+    logging.basicConfig(level=logging.INFO, handlers=[TextualHandler()])
     parser = argparse.ArgumentParser(description="GitHub Star Favorite TUI")
     parser.add_argument("--sync", action="store_true", help="差分同期を実行してから起動")
     parser.add_argument("--sync-full", action="store_true", help="全件同期を実行してから起動")

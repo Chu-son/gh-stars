@@ -1,7 +1,10 @@
+import logging
 from textual.app import App
 from .screens.main_screen import MainScreen
 from processor.database.connection import get_db_connection
 from processor.database.schema import initialize_schema
+
+logger = logging.getLogger(__name__)
 
 class GhFavoriteApp(App):
     """GitHub Star Favorite TUI Application."""
@@ -38,7 +41,24 @@ class GhFavoriteApp(App):
             initialize_schema(conn)
 
     def on_mount(self) -> None:
+        logger.info("GhFavoriteApp started and mounted.")
         self.push_screen(MainScreen())
+        # バックグラウンドで検索エンジン（モデル）のロードを開始
+        self._preload_search()
+
+    from textual import work
+    @work(thread=True)
+    def _preload_search(self) -> None:
+        """検索エンジン（LLMなど）をバックグラウンドで事前ロードします。"""
+        from processor.search import create_search
+        try:
+            # tagger_mode に関係なく、EmbeddingSearch を使う設定ならロードされる
+            searcher = create_search(self.app_config.db_path, self.app_config.tagger_mode)
+            if hasattr(searcher, "model"):
+                _ = searcher.model # プロパティアクセスでロードをトリガー
+                logger.info("Search engine preloaded successfully.")
+        except Exception as e:
+            logger.error(f"Failed to preload search engine: {e}")
 
     async def action_sync_incremental(self) -> None:
         from collector.github_client import GitHubClient
