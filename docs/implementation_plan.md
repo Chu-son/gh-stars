@@ -1,11 +1,10 @@
-# GitHub Star管理TUIツール 実装計画書（最終版）
+# GitHub Star管理TUIツール 実装計画書（フェーズ3完了版）
 
-GitHubのスター付きリポジトリを効率的に管理・検索・閲覧するTUIアプリケーション。
+GitHubのスター付きリポジトリをAI（ローカルLLM）とベクトル検索で高度に管理するTUIアプリケーション。
 
-**環境**: `uv` のみ（Docker不使用）  
-**PAT管理**: `.env` ファイルのみ  
-**パッケージ構成**: 4つの独立パッケージ（モノレポ／uv workspaces）  
-**ローカルLLM**: Ollama をホストにネイティブインストールして使用（フェーズ3）
+**ステータス**: フェーズ3 全機能実装完了 (2026-04-03)
+**環境**: `uv` + `Ollama` (Native)  
+**主要技術**: Textual, SQLite, `sqlite-vec`, `sentence-transformers`  
 
 ---
 
