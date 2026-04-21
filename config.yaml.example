@@ -1,5 +1,21 @@
 database:
-  path: ./data/gh_stars.db
+  backend: sqlite           # sqlite | mariadb (デフォルト: sqlite)
+  path: ./data/gh_stars.db  # SQLiteバックエンドのパス
+
+  # MariaDB設定 (backend: mariadb の場合に使用)
+  mariadb:
+    host: 192.168.x.x       # NASのIPアドレス (例: Synology DS223j)
+    port: 3306
+    user: ghstars_user
+    password: ""            # .env の MARIADB_PASSWORD で設定することを推奨
+    database: gh_stars
+
+  # ローカルキャッシュ設定 (backend: mariadb かつローカルキャッシュを使う場合)
+  # enabled: true にすると NAS MariaDB をマスター、ローカルSQLiteをキャッシュとして扱う
+  # C キーでキャッシュの差分更新が可能。NAS切断時もローカルキャッシュで閲覧継続できる。
+  cache:
+    enabled: false
+    path: ./data/gh_stars_cache.db
 
 tagger:
   mode: rule_based               # rule_based | ml | llm

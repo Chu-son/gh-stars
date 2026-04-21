@@ -109,20 +109,28 @@ class TagEditModal(ModalScreen[bool]):
 
     def save_and_close(self) -> None:
         app_config = self.app.app_config
+        final_tags = list(self.selected_tags)
+
         with get_db_connection(app_config.db_path) as conn:
             # 既存の全タグと比較して差分を記録する等のこだわりも可能だが、
             # 今回は repository.py の方針に従い manual ソースで一括更新
-            repository.set_tags_for_repo(conn, self.repo_id, list(self.selected_tags), source='manual')
-            
+            repository.set_tags_for_repo(conn, self.repo_id, final_tags, source='manual')
+
             # ML モードの場合は学習を回す
             if app_config.tagger_mode == "ml":
                 from processor.tagging import create_tagger
                 repo = repository.get_repository_by_id(conn, self.repo_id)
                 if repo:
                     tagger = create_tagger(app_config.tagger_mode, app_config)
-                    tagger.learn(repo, list(self.selected_tags))
-            
+                    tagger.learn(repo, final_tags)
+
             conn.commit()
+
+        # キャッシュモード時: タグをリモートDBへ即時反映 (後勝ち + 競合ログ出力)
+        cache_sync = getattr(self.app, "cache_sync", None)
+        if cache_sync is not None and cache_sync.is_remote_available():
+            cache_sync.push_tags(self.repo_id, final_tags, source="manual")
+
         self.dismiss(True)
 
     def action_dismiss_false(self) -> None:

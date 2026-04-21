@@ -33,13 +33,22 @@ def test_repository_upsert_and_get(db_conn):
 
 def test_tags_management(db_conn):
     repo_id = "repo1"
+    # 外部キー制約のためリポジトリを先に作成
+    import json
+    repository.upsert_repository(db_conn, {
+        "github_id": repo_id, "name": "repo1", "full_name": "owner/repo1",
+        "url": "https://github.com/owner/repo1", "description": None,
+        "primary_language": None, "topics": json.dumps([]),
+        "stars": 0, "forks": 0, "license": None, "readme": None,
+        "starred_at": "2024-01-01T00:00:00Z", "synced_at": "2024-01-01T00:00:00Z"
+    })
     # タグ追加
     repository.get_or_create_tag(db_conn, "tag1")
     repository.set_tags_for_repo(db_conn, repo_id, ["tag1", "tag2"], source='manual')
-    
+
     tags = repository.get_tags_for_repo(db_conn, repo_id)
     assert sorted(tags) == ["tag1", "tag2"]
-    
+
     # タグ削除
     repository.remove_tag_from_repo(db_conn, repo_id, "tag1")
     tags = repository.get_tags_for_repo(db_conn, repo_id)

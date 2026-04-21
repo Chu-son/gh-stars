@@ -42,26 +42,21 @@ CREATE TABLE IF NOT EXISTS sync_meta (
 """
 
 VEC_SCHEMA = """
--- フェーズ3: ベクトル検索用。sqlite-vec がロードされている場合のみ有効。
-CREATE VIRTUAL TABLE IF NOT EXISTS vec_repositories USING vec0(
-  repo_id TEXT PRIMARY KEY,
-  embedding float[384]
+-- ベクトル検索用テーブル。embedding は float32 バイト列 (BLOB) として格納し、
+-- 類似度計算は Python (numpy) 側で実行する (sqlite-vec 拡張不使用)。
+CREATE TABLE IF NOT EXISTS vec_repositories (
+  repo_id   TEXT PRIMARY KEY,
+  embedding BLOB
 );
 """
 
-def initialize_schema(conn):
-    """データベースのスキーマを初期化します。"""
-    # 既存のテーブルをまず作成
+def initialize_schema(conn) -> None:
+    """データベースのスキーマを初期化します。
+
+    Args:
+        conn: sqlite3.Connection 互換の接続オブジェクト。
+              MariaDBBackend 経由の接続の場合は自動的に SQL 方言が変換される。
+    """
     conn.executescript(BASE_SCHEMA)
-    
-    # vec0 モジュールが利用可能かチェック
-    try:
-        # pragma_module_list は関数形式で呼び出す必要がある場合がある
-        cursor = conn.execute("SELECT name FROM pragma_module_list() WHERE name = 'vec0'")
-        if cursor.fetchone():
-            conn.executescript(VEC_SCHEMA)
-    except Exception:
-        # pragma_module_list が使えない場合や vec0 が無い場合は無視
-        pass
-        
+    conn.executescript(VEC_SCHEMA)
     conn.commit()

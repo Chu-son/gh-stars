@@ -9,9 +9,9 @@ dependencies = []
 ml = ["scikit-learn>=1.4"]
 llm = [
   "sentence-transformers>=3.0.0",
-  "sqlite-vec>=0.1.0",
   "httpx>=0.27.0"
 ]
+mariadb = ["pymysql>=1.1"]
 
 [build-system]
 requires = ["hatchling"]

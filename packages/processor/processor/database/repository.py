@@ -1,10 +1,10 @@
 import json
-import sqlite3
 from datetime import datetime
+from typing import Any
 
 # リポジトリ操作
 
-def upsert_repository(conn: sqlite3.Connection, repo: dict) -> None:
+def upsert_repository(conn: Any, repo: dict) -> None:
     """リポジトリ情報を保存または更新します。"""
     query = """
     INSERT OR REPLACE INTO repositories (
@@ -32,7 +32,7 @@ SORT_COLUMNS = {
     "starred_at": "r.starred_at",
 }
 
-def get_all_repositories(conn: sqlite3.Connection, tag_filter: str | None = None,
+def get_all_repositories(conn: Any, tag_filter: str | None = None,
                          language_filter: str | None = None,
                          keyword: str | None = None, sort_by: str = "starred_at",
                          sort_descending: bool = True) -> list[dict]:
@@ -71,13 +71,13 @@ def get_all_repositories(conn: sqlite3.Connection, tag_filter: str | None = None
     cursor = conn.execute(query, params)
     return [dict(row) for row in cursor.fetchall()]
 
-def get_repository_by_id(conn: sqlite3.Connection, github_id: str) -> dict | None:
+def get_repository_by_id(conn: Any, github_id: str) -> dict | None:
     """ID\u6307\u5b9a\u3067\u30ea\u30dd\u30b8\u30c8\u30ea\u3092\u53d6\u5fb7\u3059\u308b\u3002"""
     query = "SELECT * FROM repositories WHERE github_id = ?"
     row = conn.execute(query, (github_id,)).fetchone()
     return dict(row) if row else None
 
-def get_all_repositories_for_retagging(conn: sqlite3.Connection) -> list[dict]:
+def get_all_repositories_for_retagging(conn: Any) -> list[dict]:
     """\u518d\u30bf\u30b0\u4ed8\u3051\u5c02\u7528: topics \u3092 list[str] \u306b\u30c7\u30b7\u30ea\u30a2\u30e9\u30a4\u30ba\u3057\u3066\u5168\u30ea\u30dd\u30b8\u30c8\u30ea\u3092\u8fd4\u3059\u3002
     
     \u901a\u5e38\u306e get_all_repositories() \u306f topics \u3092 str \u306e\u307e\u307e\u8fd4\u3059\u305f\u3081\u3001
@@ -98,7 +98,7 @@ def get_all_repositories_for_retagging(conn: sqlite3.Connection) -> list[dict]:
         repos.append(repo)
     return repos
 
-def get_random_repository(conn: sqlite3.Connection, tag_filter: str | None = None) -> dict | None:
+def get_random_repository(conn: Any, tag_filter: str | None = None) -> dict | None:
     """ランダムにリポジトリを1つ取得します。"""
     query = "SELECT r.* FROM repositories r"
     params = {}
@@ -116,7 +116,7 @@ def get_random_repository(conn: sqlite3.Connection, tag_filter: str | None = Non
 
 # タグ操作
 
-def get_or_create_tag(conn: sqlite3.Connection, name: str) -> int:
+def get_or_create_tag(conn: Any, name: str) -> int:
     """タグを取得または作成し、そのIDを返します。"""
     cursor = conn.execute("SELECT id FROM tags WHERE name = ?", (name,))
     row = cursor.fetchone()
@@ -126,7 +126,7 @@ def get_or_create_tag(conn: sqlite3.Connection, name: str) -> int:
     cursor = conn.execute("INSERT INTO tags (name) VALUES (?)", (name,))
     return cursor.lastrowid
 
-def get_tags_for_repo(conn: sqlite3.Connection, repo_id: str) -> list[str]:
+def get_tags_for_repo(conn: Any, repo_id: str) -> list[str]:
     """指定したリポジトリに紐づくタグ名一覧を取得します。"""
     query = """
     SELECT t.name FROM tags t
@@ -136,7 +136,7 @@ def get_tags_for_repo(conn: sqlite3.Connection, repo_id: str) -> list[str]:
     cursor = conn.execute(query, (repo_id,))
     return [row[0] for row in cursor.fetchall()]
 
-def set_tags_for_repo(conn: sqlite3.Connection, repo_id: str, tag_names: list[str],
+def set_tags_for_repo(conn: Any, repo_id: str, tag_names: list[str],
                       source: str = 'auto') -> None:
     """リポジトリのタグをリセットして設定します。"""
     # 既存の当該ソースのタグを削除（手動タグは残す等の制御が必要ならソースを指定）
@@ -151,7 +151,7 @@ def set_tags_for_repo(conn: sqlite3.Connection, repo_id: str, tag_names: list[st
         if source == 'manual':
             record_tag_edit(conn, repo_id, 'add', name)
 
-def add_tag_to_repo(conn: sqlite3.Connection, repo_id: str, tag_name: str, source: str) -> None:
+def add_tag_to_repo(conn: Any, repo_id: str, tag_name: str, source: str) -> None:
     """タグを追加します。"""
     tag_id = get_or_create_tag(conn, tag_name)
     conn.execute("INSERT OR IGNORE INTO repository_tags (repo_id, tag_id, source) VALUES (?, ?, ?)",
@@ -159,7 +159,7 @@ def add_tag_to_repo(conn: sqlite3.Connection, repo_id: str, tag_name: str, sourc
     if source == 'manual':
         record_tag_edit(conn, repo_id, 'add', tag_name)
 
-def remove_tag_from_repo(conn: sqlite3.Connection, repo_id: str, tag_name: str) -> None:
+def remove_tag_from_repo(conn: Any, repo_id: str, tag_name: str) -> None:
     """タグを削除します。"""
     cursor = conn.execute("SELECT id FROM tags WHERE name = ?", (tag_name,))
     row = cursor.fetchone()
@@ -168,30 +168,30 @@ def remove_tag_from_repo(conn: sqlite3.Connection, repo_id: str, tag_name: str) 
         conn.execute("DELETE FROM repository_tags WHERE repo_id = ? AND tag_id = ?", (repo_id, tag_id))
         record_tag_edit(conn, repo_id, 'remove', tag_name)
 
-def get_all_tags(conn: sqlite3.Connection) -> list[str]:
+def get_all_tags(conn: Any) -> list[str]:
     """登録されている全タグ名を取得します。"""
     cursor = conn.execute("SELECT name FROM tags ORDER BY name ASC")
     return [row[0] for row in cursor.fetchall()]
 
-def get_all_languages(conn: sqlite3.Connection) -> list[str]:
+def get_all_languages(conn: Any) -> list[str]:
     """登録されている全リポジトリの主要言語(primary_language)一覧を取得します。"""
     query = "SELECT DISTINCT primary_language FROM repositories WHERE primary_language IS NOT NULL ORDER BY primary_language ASC"
     cursor = conn.execute(query)
     return [row[0] for row in cursor.fetchall()]
 
-def record_tag_edit(conn: sqlite3.Connection, repo_id: str, action: str, tag_name: str) -> None:
+def record_tag_edit(conn: Any, repo_id: str, action: str, tag_name: str) -> None:
     """タグの変更履歴を記録します。"""
     query = "INSERT INTO tag_edit_history (repo_id, action, tag_name, edited_at) VALUES (?, ?, ?, ?)"
     conn.execute(query, (repo_id, action, tag_name, datetime.now().isoformat()))
 
 # 同期メタ操作
 
-def get_sync_meta(conn: sqlite3.Connection, key: str) -> str | None:
+def get_sync_meta(conn: Any, key: str) -> str | None:
     """同期メタデータを取得します。"""
     cursor = conn.execute("SELECT value FROM sync_meta WHERE key = ?", (key,))
     row = cursor.fetchone()
     return row[0] if row else None
 
-def set_sync_meta(conn: sqlite3.Connection, key: str, value: str) -> None:
+def set_sync_meta(conn: Any, key: str, value: str) -> None:
     """同期メタデータを保存します。"""
     conn.execute("INSERT OR REPLACE INTO sync_meta (key, value) VALUES (?, ?)", (key, value))
